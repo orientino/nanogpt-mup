@@ -1,3 +1,5 @@
+gpu.sh
+
 .DS_Store
 .idea
 .ipynb_checkpoints/
@@ -7,6 +9,7 @@ __pycache__/
 *.pkl
 *.pt
 *.pyc
+*.out
 input.txt
 env/
 venv/
