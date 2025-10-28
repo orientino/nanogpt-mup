@@ -319,14 +319,13 @@ while True:
             if iter_num > 0:
                 checkpoint = {
                     'model': raw_model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
                     'model_args': model_args,
                     'iter_num': iter_num,
                     'best_val_loss': best_val_loss,
                     'config': config,
                 }
                 print(f"saving checkpoint to {out_dir}")
-                torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+                torch.save(checkpoint, os.path.join(out_dir, 'ckpt_best.pt'))
     if iter_num == 0 and eval_only:
         break
 
@@ -400,6 +399,15 @@ while True:
 
     # termination conditions
     if iter_num > max_iters:
+        checkpoint = {
+            'model': raw_model.state_dict(),
+            'model_args': model_args,
+            'iter_num': iter_num,
+            'best_val_loss': best_val_loss,
+            'config': config,
+        }
+        print(f"saving checkpoint to {out_dir}")
+        torch.save(checkpoint, os.path.join(out_dir, 'ckpt_last.pt'))
         break
 
 if ddp:
