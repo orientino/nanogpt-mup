@@ -1,4 +1,4 @@
-for width in 256 512 1024 2048
+for width in 128 512 2048 8192
 do
     for lr in 0.125 0.0625 0.03125 0.015625 0.0078125 0.00390625 0.001953125 0.0009765625 0.00048828125 0.000244140625 0.0001220703125 0.00006103515625
     do
@@ -6,18 +6,18 @@ do
         do
             head_size=64
             n_heads=$((width / head_size))
-            mup_base_width=256
+            mup_base_width=128
             mup_width_multiplier=$(echo "scale=8; $width/$mup_base_width" | bc -l)
-            out_dir="mup_examples/mutransfer_lr_shakespeare_char/mup/out/width${width}_depth2_seed${seed}_lr${lr}"
+            out_dir="/project/home/p200535/project/nanogpt-mup/shakespeare_char/mup/width${width}_depth2_seed${seed}_lr${lr}"
             python train.py \
                 --out_dir=$out_dir \
                 --eval_interval=1 \
                 --log_interval=1 \
                 --eval_iters=1 \
                 --eval_only=False \
-                --skip_val_loss=True \
+                --skip_val_loss=False \
                 --always_save_checkpoint=False \
-                --never_save_checkpoint=True \
+                --never_save_checkpoint=False \
                 --init_from='scratch' \
                 --wandb_log=False \
                 --csv_log=True \
@@ -32,9 +32,9 @@ do
                 --bias=False \
                 --init_std=0.02 \
                 --learning_rate=$lr \
-                --max_iters=122 \
+                --max_iters=128 \
                 --weight_decay=1e-1 \
-                --beta1=0.9 \
+                --beta1=0.95 \
                 --beta2=0.95 \
                 --grad_clip=1.0 \
                 --decay_lr=False \
@@ -44,7 +44,7 @@ do
                 --mup_output_alpha=1.0 \
                 --seed=$seed \
                 --backend='nccl' \
-                --device='mps' \
+                --device='cuda' \
                 --dtype='float32' \
                 --compile=False
         done
