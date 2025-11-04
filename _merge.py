@@ -1,3 +1,4 @@
+import argparse
 import json
 from collections import defaultdict
 import os
@@ -14,6 +15,9 @@ from tqdm import tqdm
 
 from model import GPTConfig, GPT
 
+args = argparse.ArgumentParser()
+args.add_argument('--init', type=str, choices=['mup', 'sp'], required=True)
+args = args.parse_args()
 
 rootd = "data"
 rootm = "/project/home/p200535/project/nanogpt-mup"
@@ -72,38 +76,50 @@ def interpolate_weights(w1, w2, n, return_alphas=True):
         return alphas, weights
     return weights
 
+widths = [128, 512, 2048, 8192]
+seeds = [1, 2, 3]
+init = args.init
+if init == "mup":
+    lrs = [
+        0.125,
+        0.0625,
+        0.03125,
+        0.015625,
+        0.0078125,
+        0.00390625,
+        0.001953125,
+        0.0009765625,
+        0.00048828125,
+        0.000244140625,
+        0.0001220703125,
+        0.00006103515625
+    ]
+elif init == "sp":
+    lrs = [
+        0.00390625,
+        0.001953125,
+        0.0009765625,
+        0.00048828125,
+        0.000244140625,
+        0.0001220703125,
+        0.00006103515625,
+        0.00003051757812,
+        0.00001525878906,
+        0.000007629394531,
+        0.000003814697266
+    ]
+else:
+    raise ValueError
 
-widths = [
-    128,
-    512,
-    2048,
-    8192,
-]
-lrs = [
-    0.125,
-    0.0625,
-    0.03125,
-    0.015625,
-    0.0078125,
-    0.00390625,
-    0.001953125,
-    0.0009765625,
-    0.00048828125,
-    0.000244140625,
-    0.0001220703125,
-    0.00006103515625,
-    0.00003051757812,
-    0.00001525878906,
-    0.000007629394531,
-    0.000003814697266,
-]
+print(init)
+print(widths)
 
 summary = {}
-for init in ["mup", "sp"]:
-    summary[init] = {}
+for s in seeds:
+    summary[s] = {}
 
     for lr in tqdm(lrs):
-        summary[init][lr] = {}
+        summary[s][lr] = {}
 
         for width in widths:
             head_size = 64
@@ -122,13 +138,15 @@ for init in ["mup", "sp"]:
             gptconf = GPTConfig(**model_args)
             
             # Merge weights
+            name1 = f"width{width}_depth2_seed{s}_lr{lr:.20f}".rstrip('0')
+            name2 = f"width{width}_depth2_seed{s%3+1}_lr{lr:.20f}".rstrip('0')
             state_dict1 = torch.load(
-                f"{rootm}/{ds}/{init}/width{width}_depth2_seed1_lr{lr}/ckpt_last.pt",
+                f"{rootm}/{ds}/{init}/{name1}/ckpt_last.pt",
                 weights_only=True,
                 map_location='cpu',  # load on CPU to save GPU memory
             )["model"]
             state_dict2 = torch.load(
-                f"{rootm}/{ds}/{init}/width{width}_depth2_seed2_lr{lr}/ckpt_last.pt",
+                f"{rootm}/{ds}/{init}/{name2}/ckpt_last.pt",
                 weights_only=True,
                 map_location='cpu',
             )["model"]
@@ -136,13 +154,13 @@ for init in ["mup", "sp"]:
             
             # Evaluation
             m = GPT(gptconf).to(DEVICE)
-            summary[init][lr][width] = defaultdict(list)
+            summary[s][lr][width] = defaultdict(list)
             for w in weights:
                 m.load_state_dict(w)
                 losses = estimate_loss(m)
-                summary[init][lr][width]["tr_loss"].append(losses['tr'])
-                summary[init][lr][width]["vl_loss"].append(losses['vl'])
+                summary[s][lr][width]["tr_loss"].append(losses['tr'])
+                summary[s][lr][width]["vl_loss"].append(losses['vl'])
 
 
-with open("mup_examples/mutransfer_lr_shakespeare_char/merge.json", "w") as f:
+with open(f"mup_examples/mutransfer_lr_shakespeare_char/merge_{init}.json", "w") as f:
     json.dump(summary, f)
