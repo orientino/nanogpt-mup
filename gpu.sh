@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --gpus=1
 #SBATCH --partition=gpu
-#SBATCH --time=0-08:00:00
+#SBATCH --time=0-20:00:00
 #SBATCH --output=slurm-%x-%j.out
 
 echo -e "--------------------------------"
@@ -23,5 +23,7 @@ micromamba activate mup
 
 # mup_examples/mutransfer_lr_shakespeare_char/mup/run.sh
 # mup_examples/mutransfer_lr_shakespeare_char/sp/run.sh
-python _merge.py --init sp
+# python _merge.py --init sp
 
+# completep_examples/coord_check_shakespeare_char/sp_and_mup/run_sp.sh
+# completep_examples/coord_check_shakespeare_char/depth_alpha_1_aka_completep/run.sh
