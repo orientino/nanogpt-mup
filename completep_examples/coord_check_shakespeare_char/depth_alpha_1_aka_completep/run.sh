@@ -1,5 +1,4 @@
-# for depth in 2 8 32
-for depth in 128
+for depth in 2 8 32 128
 do
     # for lr in 0.125 0.0625 0.03125 0.015625 0.0078125 0.00390625 0.001953125 0.0009765625 0.00048828125 0.000244140625 0.0001220703125 0.00006103515625
     for lr in 0.125 0.03125 0.0078125 0.001953125 0.00048828125 0.0001220703125 
@@ -47,8 +46,8 @@ do
                 --mup_output_alpha=1.0 \
                 --mup_enable_coord_check_logging=True \
                 --depth_alpha_enabled=True  \
+                --depth_alpha_exp=1.0 \
                 --depth_multiplier=$mup_depth_multiplier \
-                --depth_alpha_exp=$depth_alpha_exp \
                 --seed=$seed \
                 --backend='nccl' \
                 --device='cuda' \

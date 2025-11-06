@@ -16,7 +16,8 @@ from tqdm import tqdm
 from model import GPTConfig, GPT
 
 args = argparse.ArgumentParser()
-args.add_argument('--init', type=str, choices=['mup', 'sp'], required=True)
+args.add_argument('--init', type=str, required=True)
+args.add_argument('--bias', action='store_true')
 args = args.parse_args()
 
 rootd = "data"
@@ -76,41 +77,36 @@ def interpolate_weights(w1, w2, n, return_alphas=True):
         return alphas, weights
     return weights
 
-widths = [128, 512, 2048, 8192]
 seeds = [1, 2, 3]
 init = args.init
-if init == "mup":
-    lrs = [
-        0.125,
-        0.0625,
-        0.03125,
-        0.015625,
-        0.0078125,
-        0.00390625,
-        0.001953125,
-        0.0009765625,
-        0.00048828125,
-        0.000244140625,
-        0.0001220703125,
-        0.00006103515625
-    ]
-elif init == "sp":
-    lrs = [
-        0.00390625,
-        0.001953125,
-        0.0009765625,
-        0.00048828125,
-        0.000244140625,
-        0.0001220703125,
-        0.00006103515625,
-        0.00003051757812,
-        0.00001525878906,
-        0.000007629394531,
-        0.000003814697266
-    ]
-else:
-    raise ValueError
+lrs = [
+    0.125,
+    0.0625,
+    0.03125,
+    0.015625,
+    0.0078125,
+    0.00390625,
+    0.001953125,
+    0.0009765625,
+    0.00048828125,
+    0.000244140625,
+    0.0001220703125,
+    0.00006103515625,
+    0.00003051757812,
+    0.00001525878906,
+    0.000007629394531,
+    0.000003814697266,
+]
+# widths, depths = [128, 512, 2048, 8192], [2]
+# depth = depths[0]
+widths, depths = [256], [2, 8, 32, 128]
+width = widths[0]
 
+depth_alpha_enabled = args.init == "completep"
+mup_enabled = args.init == "mup" or depth_alpha_enabled
+
+print("mup enabled: ", mup_enabled)
+print("depth enabled: ", depth_alpha_enabled)
 print(init)
 print(widths)
 
@@ -121,25 +117,36 @@ for s in seeds:
     for lr in tqdm(lrs):
         summary[s][lr] = {}
 
-        for width in widths:
+        for depth in depths:
+            name = f'width{width}_depth{depth}_seed1_lr{lr:.20f}'.rstrip('0')
+            path = os.path.join(rootm, ds, init, name)
+            if not os.path.isdir(path):
+                print(f"missing: {path}")
+                continue
+
             head_size = 64
             n_heads = width // head_size
             model_args = dict(
-                n_layer=2,
+                n_layer=depth,
                 n_head=n_heads,
                 n_embd=width,
                 block_size=block_size,
-                bias=False,
+                bias=args.bias,
                 vocab_size=meta_vocab_size if meta_vocab_size is not None else 50304,
                 dropout=0.0,
-                mup_enabled=(init == "mup"),
-                mup_width_multiplier=width / widths[0] if init == "mup" else 1.0
+                mup_enabled=mup_enabled,
+                mup_input_alpha=1.0,
+                mup_output_alpha=1.0,
+                mup_width_multiplier=width / widths[0] if mup_enabled else 1.0,
+                depth_alpha_enabled=depth_alpha_enabled,
+                depth_alpha_exp=1.0,
+                depth_multiplier=depth / depths[0] if depth_alpha_enabled else 1.0,
             )
             gptconf = GPTConfig(**model_args)
             
             # Merge weights
-            name1 = f"width{width}_depth2_seed{s}_lr{lr:.20f}".rstrip('0')
-            name2 = f"width{width}_depth2_seed{s%3+1}_lr{lr:.20f}".rstrip('0')
+            name1 = f"width{width}_depth{depth}_seed{s}_lr{lr:.20f}".rstrip('0')
+            name2 = f"width{width}_depth{depth}_seed{s%3+1}_lr{lr:.20f}".rstrip('0')
             state_dict1 = torch.load(
                 f"{rootm}/{ds}/{init}/{name1}/ckpt_last.pt",
                 weights_only=True,
@@ -154,13 +161,14 @@ for s in seeds:
             
             # Evaluation
             m = GPT(gptconf).to(DEVICE)
-            summary[s][lr][width] = defaultdict(list)
-            for w in weights:
+            summary[s][lr][depth] = defaultdict(list)
+            for i, w in enumerate(weights):
                 m.load_state_dict(w)
                 losses = estimate_loss(m)
-                summary[s][lr][width]["tr_loss"].append(losses['tr'])
-                summary[s][lr][width]["vl_loss"].append(losses['vl'])
+                summary[s][lr][depth]["tr_loss"].append(losses['tr'])
+                summary[s][lr][depth]["vl_loss"].append(losses['vl'])
+                print(f"i {i} lr {lr} tr {losses['tr']:.4f} vl {losses['vl']:.4f}")
 
 
-with open(f"mup_examples/mutransfer_lr_shakespeare_char/merge_{init}.json", "w") as f:
+with open(f"results/shakespeare_char/merge_{init}.json", "w") as f:
     json.dump(summary, f)
